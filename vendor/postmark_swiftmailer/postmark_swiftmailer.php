@@ -42,6 +42,9 @@ class Swift_PostmarkTransport implements Swift_Transport {
 	/** @var array */
 	protected $UNSUPPORTED_HEADERS = array('Bcc', 'Cc');
 	
+	/** @var string */
+	protected $postmark_from_signature = NULL;
+	
 	/**
 	 * @param string $postmark_api_token Postmark API key
 	 * @param string|array $from Postmark sender signature email
@@ -157,7 +160,7 @@ class Swift_PostmarkTransport implements Swift_Transport {
 		$response = curl_exec($curl);
 		if ($response === false)
 			$this->fail('Postmark delivery failed: ' . curl_error($curl));
-			
+
 		$response_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 		return array($response_code, @json_decode($response, true));
 	}
@@ -172,8 +175,15 @@ class Swift_PostmarkTransport implements Swift_Transport {
 	 * @return int
 	 */
 	public function send(Swift_Mime_Message $message, &$failed_recipients = NULL) {
-		if (!is_null($this->postmark_from_signature))
-			$message->setFrom($this->postmark_from);
+	  // If no From header is set, we'll use the Postmark default from address
+	  // $message->getFrom() returns array('email@address.com => 'Name of sender')
+	  if (!count($message->getFrom()))
+	  {
+  		if (!is_null($this->postmark_from_signature))
+  		{
+  			$message->setFrom($this->postmark_from_signature);
+  		}
+  	}
 		
 		$failed_recipients = (array)$failed_recipients;
    		$message_data = $this->buildMessageData($message);
@@ -194,7 +204,7 @@ class Swift_PostmarkTransport implements Swift_Transport {
 					"Postmark delivery failed with HTTP status code {$response_code}. " .
 					"Postmark said: '{$response['Message']}'"
 				);
-				
+
 			} else {
 				$send_count++;
 			}
